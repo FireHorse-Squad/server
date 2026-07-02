@@ -13,9 +13,11 @@ const { initializeUsers } = require('../models/authModel');
 
 const app = express();
 
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+
 // Middleware: Single, clean configuration
 app.use(cors({
-    origin: 'https://client-dhj143nql-firehorsepayrollsystem-4172s-projects.vercel.app',
+    origin: FRONTEND_URL,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true

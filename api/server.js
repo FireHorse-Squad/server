@@ -52,8 +52,6 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-app.options('/*', cors(corsOptions));
-
 // Add this right before your routes
 app.get('/api/test-db', async (req, res) => {
     try {

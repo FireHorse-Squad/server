@@ -9,14 +9,18 @@ const pool = mysql.createPool({
   database: process.env.DB_NAME,
 
   waitForConnections: true,
-  connectionLimit: 10,
+  connectionLimit: 20,
   queueLimit: 0,
-
-  connectTimeout: 60000,
+  idleTimeout: 30000,
+  connectTimeout: 2000,
 
   ssl: {
     rejectUnauthorized: false
   }
+});
+
+pool.on('error', (err) => {
+  console.error('Unexpected pool error:', err.message);
 });
 
 module.exports = pool;

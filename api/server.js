@@ -41,6 +41,26 @@ app.use('/api/clientrates', clientRatesRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/publicholidays', publicHolidayRoutes);
 
+
+// Testing DB Connection
+app.get("/api/db-test", async (req, res) => {
+    try {
+        const [db] = await pool.query("SELECT DATABASE() AS db");
+        const [tables] = await pool.query("SHOW TABLES");
+
+        res.json({
+            connected: true,
+            database: db[0].db,
+            tables
+        });
+    } catch (err) {
+        res.status(500).json({
+            connected: false,
+            error: err.message
+        });
+    }
+});
+
 // 404 handler
 app.use((req, res, next) => {
     console.log(`[404] ${req.method} ${req.url}`);

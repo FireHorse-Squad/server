@@ -114,7 +114,7 @@ const initializeUsers = async () => {
                     full_name VARCHAR(255) NOT NULL,
                     email VARCHAR(255) UNIQUE NOT NULL,
                     password_hash VARCHAR(255) NOT NULL,
-                    role ENUM('Account Manager', 'Wages Clerk', 'Accounts Clerk') NOT NULL DEFAULT 'Wages Clerk',
+                    role ENUM('Account Manager', 'Wages Clerk', 'Accounts Clerk', 'Wages HR') NOT NULL DEFAULT 'Wages Clerk',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
                 )
@@ -133,6 +133,17 @@ const initializeUsers = async () => {
             
             console.log('Default users created successfully');
         } else {
+            // Update users table ENUM to include Wages HR if missing
+            try {
+                await pool.query(`
+                    ALTER TABLE users 
+                    MODIFY COLUMN role ENUM('Account Manager', 'Wages Clerk', 'Accounts Clerk', 'Wages HR') NOT NULL DEFAULT 'Wages Clerk'
+                `);
+                console.log('Users table ENUM updated to include Wages HR');
+            } catch (err) {
+                console.log('Note: Could not update users table ENUM:', err.message);
+            }
+
             // Check if there are any users - if not, create defaults
             const [users] = await pool.query('SELECT COUNT(*) as count FROM users');
             
@@ -151,10 +162,50 @@ const initializeUsers = async () => {
             }
         }
         
+        // Ensure required tables exist
+        await ensureRequiredTables();
+        
         // Add user_id columns to tables if they don't exist
         await addUserIdToTables();
     } catch (error) {
         console.error('Error initializing users:', error);
+    }
+};
+
+// Ensure required tables exist
+const ensureRequiredTables = async () => {
+    const tables = {
+        public_holidays: `
+            CREATE TABLE IF NOT EXISTS public_holidays (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                holiday_date DATE NOT NULL UNIQUE,
+                description VARCHAR(255),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `,
+        transaction_codes: `
+            CREATE TABLE IF NOT EXISTS transaction_codes (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                transaction_code VARCHAR(50) NOT NULL,
+                occupation_name VARCHAR(255),
+                user_id INT DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        `
+    };
+
+    for (const [tableName, createQuery] of Object.entries(tables)) {
+        try {
+            const [exists] = await pool.query(`SHOW TABLES LIKE '${tableName}'`);
+            if (exists.length === 0) {
+                await pool.query(createQuery);
+                console.log(`Created ${tableName} table`);
+            }
+        } catch (err) {
+            console.log(`Note: Could not create ${tableName} table:`, err.message);
+        }
     }
 };
 
@@ -201,5 +252,6 @@ module.exports = {
     updateUser,
     deleteUser,
     verifyPassword,
-    initializeUsers
+    initializeUsers,
+    ensureRequiredTables
 };

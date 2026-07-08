@@ -90,6 +90,9 @@ app.get("/api/db-test", async (req, res) => {
     }
 });
 
+// Initialize database tables and default data on startup
+initializeUsers().catch(err => console.error('Failed to initialize users:', err));
+
 // 404 handler
 app.use((req, res, next) => {
     console.log(`[404] ${req.method} ${req.url}`);

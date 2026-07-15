@@ -14,9 +14,12 @@ const pool = mysql.createPool({
   idleTimeout: 30000,
   connectTimeout: 2000,
 
-  ssl: {
-    rejectUnauthorized: false
-  }
+  // Only use SSL if we are in a deployment environment
+  ...(process.env.NODE_ENV === 'deployment' ? {
+    ssl: {
+      rejectUnauthorized: false
+    }
+  } : {})
 });
 
 pool.on('error', (err) => {

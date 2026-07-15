@@ -169,7 +169,7 @@ exports.importClientRatesCSV = async (req, res) => {
         hazardous_allowance: (values[42] && values[42] !== '' && !isNaN(values[42])) ? parseFloat(values[42]) : null,
         nt_per_day: (values[43] && values[43] !== '' && !isNaN(values[43])) ? parseFloat(values[43]) : null,
         deduct_lunch_hour: (values[44] && values[44] !== '' && !isNaN(values[44])) ? parseFloat(values[44]) : null,
-        hrs_pd: (values[45] && values[45] !== '' && !isNaN(values[45])) ? parseFloat(values[54]) : null,
+        hrs_pd: (values[45] && values[45] !== '' && !isNaN(values[45])) ? parseFloat(values[45]) : null,
       };
       
       // Skip empty rows

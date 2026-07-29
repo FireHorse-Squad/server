@@ -237,28 +237,31 @@ const ensureRequiredTables = async () => {
         const [archivedExists] = await pool.query(`SHOW TABLES LIKE 'archivedtimesheets'`);
         if (archivedExists.length > 0) {
             const [columns] = await pool.query(`
-                SELECT COLUMN_NAME 
+                SELECT COLUMN_NAME, DATA_TYPE 
                 FROM INFORMATION_SCHEMA.COLUMNS 
                 WHERE TABLE_SCHEMA = DATABASE() 
                 AND TABLE_NAME = 'archivedtimesheets'
             `);
-            const columnNames = new Set(columns.map(c => c.COLUMN_NAME));
+            const columnMap = new Map(columns.map(c => [c.COLUMN_NAME, c.DATA_TYPE]));
 
-            if (!columnNames.has('total_hours')) {
+            if ((columnMap.get('timesheet_number') || '').includes('int')) {
+                await pool.query(`ALTER TABLE archivedtimesheets MODIFY timesheet_number VARCHAR(50) NULL`);
+            }
+            if (!columnMap.has('total_hours')) {
                 await pool.query(`ALTER TABLE archivedtimesheets ADD COLUMN total_hours DECIMAL(10,2) NULL AFTER end_time`);
             }
-            if (!columnNames.has('status')) {
+            if (!columnMap.has('status')) {
                 await pool.query(`ALTER TABLE archivedtimesheets ADD COLUMN status VARCHAR(20) DEFAULT 'active' AFTER isDoubleShift`);
             }
-            if (!columnNames.has('user_id')) {
-                await pool.query(`ALTER TABLE archivedtimesheets ADD COLUMN user_id INT DEFAULT 1`);
+            if (!columnMap.has('user_id')) {
+                await pool.query(`ALTER TABLE archivedtimesheets ADD COLUMN user_id INT DEFAULT 1 AFTER status`);
                 await pool.query(`ALTER TABLE archivedtimesheets ADD FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE`);
             }
-            if (!columnNames.has('created_at')) {
-                await pool.query(`ALTER TABLE archivedtimesheets ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`);
+            if (!columnMap.has('created_at')) {
+                await pool.query(`ALTER TABLE archivedtimesheets ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP AFTER user_id`);
             }
-            if (!columnNames.has('updated_at')) {
-                await pool.query(`ALTER TABLE archivedtimesheets ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`);
+            if (!columnMap.has('updated_at')) {
+                await pool.query(`ALTER TABLE archivedtimesheets ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at`);
             }
         }
     } catch (err) {

@@ -82,31 +82,105 @@ exports.updateTimesheet = async (req, res) => {
         const existingRecord = existing[0];
 
         if (isArchive) {
-            const columns = Object.keys(existingRecord).filter(col => col !== 'id');
+            const [destCols] = await pool.query(`SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'archivedtimesheets'`);
+            const destColumnMap = new Map(destCols.map(c => [c.COLUMN_NAME, c.DATA_TYPE]));
+
+            const columns = Object.keys(existingRecord).filter(col => col !== 'id' && destColumnMap.has(col));
             const placeholders = columns.map(() => '?').join(',');
             const columnList = columns.join(',');
-            const values = columns.map(col => existingRecord[col]);
-            
-            await pool.query(`INSERT INTO archivedtimesheets (${columnList}) VALUES (${placeholders})`, values);
+            const values = columns.map(col => {
+                const val = existingRecord[col];
+                const destType = (destColumnMap.get(col) || '').toLowerCase();
+                if (val === undefined || val === null) return null;
+                if (typeof val === 'boolean') return val ? 1 : 0;
+                if (destType.includes('int')) {
+                    if (typeof val === 'number') return val;
+                    if (typeof val === 'string' && val.trim() !== '' && !isNaN(val)) return parseInt(val, 10);
+                    return null;
+                }
+                if ((destType.includes('decimal') || destType.includes('numeric')) && typeof val === 'string') {
+                    const num = parseFloat(val);
+                    return isNaN(num) ? null : num;
+                }
+                if (destType.includes('date') && col === 'timesheet_date') {
+                    if (val instanceof Date) return val.toISOString().split('T')[0];
+                    if (typeof val === 'string') return val.split(' ')[0];
+                    return val;
+                }
+                if (destType.includes('time') && typeof val === 'string') {
+                    return val.length >= 5 ? val.substring(0, 8) : val;
+                }
+                return val;
+            });
+
+            if (columns.length === 0) {
+                return res.status(500).json({ message: 'No matching columns found for archiving' });
+            }
+
+            try {
+                await pool.query(`INSERT INTO archivedtimesheets (${columnList}) VALUES (${placeholders})`, values);
+            } catch (insertError) {
+                console.error('Archive insert error:', insertError);
+                console.error('Archive insert SQL:', `INSERT INTO archivedtimesheets (${columnList}) VALUES (${placeholders})`);
+                console.error('Archive insert values:', values);
+                throw insertError;
+            }
             await pool.query('DELETE FROM timesheets WHERE id = ?', [id]);
-            
+
             return res.json({ message: 'Timesheet archived successfully' });
         }
 
         if (isUnarchive) {
-            const columns = Object.keys(existingRecord).filter(col => col !== 'id');
+            const [destCols] = await pool.query(`SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'timesheets'`);
+            const destColumnMap = new Map(destCols.map(c => [c.COLUMN_NAME, c.DATA_TYPE]));
+
+            const columns = Object.keys(existingRecord).filter(col => col !== 'id' && destColumnMap.has(col));
             const placeholders = columns.map(() => '?').join(',');
             const columnList = columns.join(',');
-            let values = columns.map(col => existingRecord[col]);
-            
+            const values = columns.map(col => {
+                const val = existingRecord[col];
+                const destType = (destColumnMap.get(col) || '').toLowerCase();
+                if (val === undefined || val === null) return null;
+                if (typeof val === 'boolean') return val ? 1 : 0;
+                if (destType.includes('int')) {
+                    if (typeof val === 'number') return val;
+                    if (typeof val === 'string' && val.trim() !== '' && !isNaN(val)) return parseInt(val, 10);
+                    return null;
+                }
+                if ((destType.includes('decimal') || destType.includes('numeric')) && typeof val === 'string') {
+                    const num = parseFloat(val);
+                    return isNaN(num) ? null : num;
+                }
+                if (destType.includes('date') && col === 'timesheet_date') {
+                    if (val instanceof Date) return val.toISOString().split('T')[0];
+                    if (typeof val === 'string') return val.split(' ')[0];
+                    return val;
+                }
+                if (destType.includes('time') && typeof val === 'string') {
+                    return val.length >= 5 ? val.substring(0, 8) : val;
+                }
+                return val;
+            });
+
             const statusIdx = columns.indexOf('status');
             if (statusIdx >= 0) {
                 values[statusIdx] = 'active';
             }
-            
-            await pool.query(`INSERT INTO timesheets (${columnList}) VALUES (${placeholders})`, values);
+
+            if (columns.length === 0) {
+                return res.status(500).json({ message: 'No matching columns found for restoring' });
+            }
+
+            try {
+                await pool.query(`INSERT INTO timesheets (${columnList}) VALUES (${placeholders})`, values);
+            } catch (insertError) {
+                console.error('Unarchive insert error:', insertError);
+                console.error('Unarchive insert SQL:', `INSERT INTO timesheets (${columnList}) VALUES (${placeholders})`);
+                console.error('Unarchive insert values:', values);
+                throw insertError;
+            }
             await pool.query('DELETE FROM archivedtimesheets WHERE id = ?', [id]);
-            
+
             return res.json({ message: 'Timesheet restored successfully' });
         }
 
@@ -155,7 +229,7 @@ exports.updateTimesheet = async (req, res) => {
         }
         res.json({ message: 'Timesheet updated successfully' });
     } catch (error) {
-        console.error(error);
+        console.error('Timesheet update error:', error);
         res.status(500).json({ message: 'Server error updating timesheet', details: error.message });
     }
 };

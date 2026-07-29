@@ -7,19 +7,27 @@ const getUserId = (req) => req.user?.id;
 // --- READ (Get All) ---
 exports.getTimesheets = async (req, res) => {
   try {
-    const userId = getUserId(req);
-    let query = 'SELECT * FROM timesheets';
-    let params = [];
-    
-    // Filter by user_id if user is authenticated (not Account Manager sees all)
-    if (req.user?.role !== 'Account Manager') {
-      query += ' WHERE user_id = ?';
-      params.push(userId);
+    const isManager = req.user?.role === 'Account Manager';
+    let activeQuery = 'SELECT *, \'active\' AS status FROM timesheets';
+    let activeParams = [];
+    let archivedQuery = 'SELECT *, \'archived\' AS status FROM archivedtimesheets';
+    let archivedParams = [];
+
+    if (!isManager) {
+      const userId = getUserId(req);
+      activeQuery += ' WHERE user_id = ?';
+      activeParams = [userId];
+      archivedQuery += ' WHERE user_id = ?';
+      archivedParams = [userId];
     }
-    
-    query += ' ORDER BY id DESC';
-    const [rows] = await pool.query(query, params);
-    res.json(rows);
+
+    const [activeRows] = await pool.query(activeQuery, activeParams);
+    const [archivedRows] = await pool.query(archivedQuery, archivedParams);
+
+    const combined = [...activeRows, ...archivedRows];
+    combined.sort((a, b) => (b.id || 0) - (a.id || 0));
+
+    res.json(combined);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error fetching timesheets' });
@@ -48,25 +56,60 @@ exports.updateTimesheet = async (req, res) => {
     const userId = getUserId(req);
     
     try {
-        // Fetch existing record first
-        let query = 'SELECT * FROM timesheets WHERE id = ?';
-        let params = [id];
-        
-        // Non-managers can only update their own records
-        if (req.user?.role !== 'Account Manager') {
-          query += ' AND user_id = ?';
-          params.push(userId);
+        let sourceTable = 'timesheets';
+        let destTable = 'timesheets';
+        let sourceStatus = null;
+        let destStatus = null;
+        let isArchive = false;
+        let isUnarchive = false;
+
+        if (updates.status === 'archived') {
+            sourceTable = 'timesheets';
+            destTable = 'archivedtimesheets';
+            isArchive = true;
+        } else if (updates.status === 'active') {
+            sourceTable = 'archivedtimesheets';
+            destTable = 'timesheets';
+            isUnarchive = true;
         }
-        
-        const [existing] = await pool.query(query, params);
-        
+
+        const [existing] = await pool.query(`SELECT * FROM ${sourceTable} WHERE id = ?${req.user?.role !== 'Account Manager' ? ' AND user_id = ?' : ''}`, isArchive || isUnarchive ? [id, userId] : [id]);
+
         if (existing.length === 0) {
             return res.status(404).json({ message: 'Timesheet not found' });
         }
-        
+
         const existingRecord = existing[0];
-        
-        // Merge existing data with updates
+
+        if (isArchive) {
+            const columns = Object.keys(existingRecord).filter(col => col !== 'id');
+            const placeholders = columns.map(() => '?').join(',');
+            const columnList = columns.join(',');
+            const values = columns.map(col => existingRecord[col]);
+            
+            await pool.query(`INSERT INTO archivedtimesheets (${columnList}) VALUES (${placeholders})`, values);
+            await pool.query('DELETE FROM timesheets WHERE id = ?', [id]);
+            
+            return res.json({ message: 'Timesheet archived successfully' });
+        }
+
+        if (isUnarchive) {
+            const columns = Object.keys(existingRecord).filter(col => col !== 'id');
+            const placeholders = columns.map(() => '?').join(',');
+            const columnList = columns.join(',');
+            let values = columns.map(col => existingRecord[col]);
+            
+            const statusIdx = columns.indexOf('status');
+            if (statusIdx >= 0) {
+                values[statusIdx] = 'active';
+            }
+            
+            await pool.query(`INSERT INTO timesheets (${columnList}) VALUES (${placeholders})`, values);
+            await pool.query('DELETE FROM archivedtimesheets WHERE id = ?', [id]);
+            
+            return res.json({ message: 'Timesheet restored successfully' });
+        }
+
         const mergedData = {
             timesheet_number: updates.timesheet_number ?? existingRecord.timesheet_number,
             client_name: updates.client_name ?? existingRecord.client_name,

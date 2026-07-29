@@ -172,7 +172,7 @@ const initializeUsers = async () => {
     }
 };
 
-// Ensure required tables exist
+// Ensure required tables exist and have required columns
 const ensureRequiredTables = async () => {
     const tables = {
         public_holidays: `
@@ -193,6 +193,31 @@ const ensureRequiredTables = async () => {
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             )
+        `,
+        archivedtimesheets: `
+            CREATE TABLE IF NOT EXISTS archivedtimesheets (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                timesheet_number VARCHAR(50) NULL,
+                client_name VARCHAR(255) NOT NULL,
+                timesheet_date DATE NOT NULL,
+                client_id INT,
+                co_number VARCHAR(255),
+                transaction_code VARCHAR(255),
+                occupation VARCHAR(255),
+                shift_type VARCHAR(50) DEFAULT 'Standard',
+                start_time VARCHAR(50),
+                end_time VARCHAR(50),
+                units DECIMAL(10,2),
+                rate DECIMAL(10,2),
+                total_hours DECIMAL(10,2) NULL,
+                actual_lunch_hours DECIMAL(10,2) NULL,
+                isDoubleShift BOOLEAN DEFAULT FALSE,
+                status VARCHAR(20) DEFAULT 'active',
+                user_id INT DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
         `
     };
 
@@ -206,6 +231,38 @@ const ensureRequiredTables = async () => {
         } catch (err) {
             console.log(`Note: Could not create ${tableName} table:`, err.message);
         }
+    }
+
+    try {
+        const [archivedExists] = await pool.query(`SHOW TABLES LIKE 'archivedtimesheets'`);
+        if (archivedExists.length > 0) {
+            const [columns] = await pool.query(`
+                SELECT COLUMN_NAME 
+                FROM INFORMATION_SCHEMA.COLUMNS 
+                WHERE TABLE_SCHEMA = DATABASE() 
+                AND TABLE_NAME = 'archivedtimesheets'
+            `);
+            const columnNames = new Set(columns.map(c => c.COLUMN_NAME));
+
+            if (!columnNames.has('total_hours')) {
+                await pool.query(`ALTER TABLE archivedtimesheets ADD COLUMN total_hours DECIMAL(10,2) NULL AFTER end_time`);
+            }
+            if (!columnNames.has('status')) {
+                await pool.query(`ALTER TABLE archivedtimesheets ADD COLUMN status VARCHAR(20) DEFAULT 'active' AFTER isDoubleShift`);
+            }
+            if (!columnNames.has('user_id')) {
+                await pool.query(`ALTER TABLE archivedtimesheets ADD COLUMN user_id INT DEFAULT 1`);
+                await pool.query(`ALTER TABLE archivedtimesheets ADD FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE`);
+            }
+            if (!columnNames.has('created_at')) {
+                await pool.query(`ALTER TABLE archivedtimesheets ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`);
+            }
+            if (!columnNames.has('updated_at')) {
+                await pool.query(`ALTER TABLE archivedtimesheets ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`);
+            }
+        }
+    } catch (err) {
+        console.log(`Note: Could not update archivedtimesheets table:`, err.message);
     }
 };
 

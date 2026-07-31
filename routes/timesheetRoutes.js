@@ -1,7 +1,7 @@
 // Timesheet Routes 
 const express = require('express');
 const multer = require('multer');
-const { getTimesheets, createTimesheet, updateTimesheet, deleteTimesheet, importTimesheetsCSV, importBiometrics, migrateFromWorkhorse } = require('../controllers/timesheetController');
+const { getTimesheets, createTimesheet, updateTimesheet, deleteTimesheet, importTimesheetsCSV, importBiometrics, migrateFromWorkhorse, exportTimesheetsCSV } = require('../controllers/timesheetController');
 const { authenticateToken } = require('../middleware/authMiddleware');
 
 const router = express.Router();
@@ -17,5 +17,6 @@ router.delete('/:id', authenticateToken, deleteTimesheet);
 router.post('/import', authenticateToken, upload.single('file'), importTimesheetsCSV);
 router.post('/import-biometrics', authenticateToken, upload.single('file'), importBiometrics);
 router.post('/migrate-from-workhorse', authenticateToken, migrateFromWorkhorse);
+router.get('/export', authenticateToken, exportTimesheetsCSV);
 
 module.exports = router;

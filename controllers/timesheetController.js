@@ -444,10 +444,71 @@ exports.importBiometrics = async (req, res) => {
   }
 };
 
+// --- EXPORT TIMESHEETS TO CSV ---
+exports.exportTimesheetsCSV = async (req, res) => {
+  try {
+    const isManager = req.user?.role === 'Account Manager';
+    let activeQuery = 'SELECT * FROM timesheets';
+    let activeParams = [];
+    let archivedQuery = 'SELECT * FROM archivedtimesheets';
+    let archivedParams = [];
+
+    if (!isManager) {
+      const userId = getUserId(req);
+      activeQuery += ' WHERE user_id = ?';
+      activeParams = [userId];
+      archivedQuery += ' WHERE user_id = ?';
+      archivedParams = [userId];
+    }
+
+    const [activeRows] = await pool.query(activeQuery, activeParams);
+    const [archivedRows] = await pool.query(archivedQuery, archivedParams);
+    const combined = [...activeRows, ...archivedRows];
+    combined.sort((a, b) => (b.id || 0) - (a.id || 0));
+
+    const headers = ['TIMESHEET NO', 'DATE', 'CLIENT ID', 'CLIENT NAME', 'EMP NO', 'EMPLOYEE NAME', 'TX CODE', 'SHIFT TYPE', 'OCCUPATION', 'START', 'END', 'TOTAL HRS', 'NT HRS', 'OT HRS', 'DT HRS', 'NT PAY(R)', 'OT PAY(R)', 'DT PAY(R)'];
+    const rows = combined.map(ts => [
+      ts.timesheet_number || '',
+      (ts.timesheet_date || '').toString().split(/[T\s]/)[0],
+      ts.client_id || '',
+      ts.client_name || '',
+      ts.co_number || '',
+      '',
+      ts.transaction_code || '',
+      ts.shift_type || '',
+      ts.occupation || '',
+      ts.start_time || '',
+      ts.end_time || '',
+      ts.total_hours || 0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]);
+
+    const escape = (val) => {
+      const str = String(val ?? '');
+      if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const csvContent = [headers, ...rows].map(row => row.map(escape).join(',')).join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=timesheets.csv');
+    res.send(csvContent);
+  } catch (error) {
+    console.error('Error exporting timesheets:', error);
+    res.status(500).json({ message: 'Server error exporting timesheets', details: error.message });
+  }
+};
+
 // --- MIGRATE FROM WORKHORSE ---
 exports.migrateFromWorkhorse = async (req, res) => {
-  try {
-    const { timesheets } = req.body;
     
     if (!timesheets || !Array.isArray(timesheets) || timesheets.length === 0) {
       return res.status(400).json({ message: 'No timesheets provided for migration' });

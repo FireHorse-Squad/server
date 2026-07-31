@@ -29,14 +29,6 @@ app.use(helmet({
 app.use(express.json());
 app.use(cookieParser());
 
-app.use((req, res, next) => {
-  const xfp = req.headers['x-forwarded-proto'];
-  if (xfp === 'http') {
-    return res.redirect(`https://${req.hostname}${req.originalUrl}`);
-  }
-  next();
-});
-
 const corsOptions = {
   origin: function(origin, callback) {
     if (!origin) return callback(null, true);
@@ -47,12 +39,20 @@ const corsOptions = {
     callback(new Error('Not allowed by CORS'));
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-Requested-With'],
   credentials: true,
   maxAge: 86400
 };
 
 app.use(cors(corsOptions));
+
+app.use((req, res, next) => {
+  const xfp = req.headers['x-forwarded-proto'];
+  if (xfp === 'http' && req.method !== 'OPTIONS') {
+    return res.redirect(`https://${req.hostname}${req.originalUrl}`);
+  }
+  next();
+});
 
 // Add this right before your routes
 app.get('/api/test-db', async (req, res) => {

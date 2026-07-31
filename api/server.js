@@ -104,5 +104,13 @@ app.use((req, res, next) => {
     });
 });
 
+// Start server only if run directly (not imported by Vercel)
+if (require.main === module) {
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+    });
+}
+
 // Export the app for Vercel
 module.exports = app;

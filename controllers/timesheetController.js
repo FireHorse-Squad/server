@@ -509,10 +509,12 @@ exports.exportTimesheetsCSV = async (req, res) => {
 
 // --- MIGRATE FROM WORKHORSE ---
 exports.migrateFromWorkhorse = async (req, res) => {
+    try {
+      const timesheets = req.body.timesheets || [];
     
-    if (!timesheets || !Array.isArray(timesheets) || timesheets.length === 0) {
-      return res.status(400).json({ message: 'No timesheets provided for migration' });
-    }
+      if (!timesheets || !Array.isArray(timesheets) || timesheets.length === 0) {
+        return res.status(400).json({ message: 'No timesheets provided for migration' });
+      }
 
     // Get userId from request (fallback to null if not authenticated for shared access)
     const userId = req.user?.id || null;

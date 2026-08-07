@@ -114,7 +114,7 @@ const initializeUsers = async () => {
                     full_name VARCHAR(255) NOT NULL,
                     email VARCHAR(255) UNIQUE NOT NULL,
                     password_hash VARCHAR(255) NOT NULL,
-                    role ENUM('Account Manager', 'Wages Clerk', 'Accounts Clerk', 'Wages HR') NOT NULL DEFAULT 'Wages Clerk',
+                    role ENUM('Account Manager', 'Wages Clerk', 'Accounts Clerk', 'Wages HR', 'Cape Town Admin') NOT NULL DEFAULT 'Wages Clerk',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
                 )
@@ -124,7 +124,8 @@ const initializeUsers = async () => {
             const defaultUsers = [
                 { full_name: 'Admin User', email: 'admin@payroll.com', password: 'admin123', role: 'Account Manager' },
                 { full_name: 'Sarah Smith', email: 'sarah@payroll.com', password: 'password123', role: 'Wages Clerk' },
-                { full_name: 'John Doe', email: 'john@payroll.com', password: 'password123', role: 'Accounts Clerk' }
+                { full_name: 'John Doe', email: 'john@payroll.com', password: 'password123', role: 'Accounts Clerk' },
+                { full_name: 'Cape Town Admin', email: 'capetown@payroll.com', password: 'capetown123', role: 'Cape Town Admin' }
             ];
             
             for (const user of defaultUsers) {
@@ -133,15 +134,15 @@ const initializeUsers = async () => {
             
             console.log('Default users created successfully');
         } else {
-            // Update users table ENUM to include Wages HR if missing
+            // Update users table ENUM to include Wages HR and Cape Town Admin if missing
             try {
                 await pool.query(`
                     ALTER TABLE users 
-                    MODIFY COLUMN role ENUM('Account Manager', 'Wages Clerk', 'Accounts Clerk', 'Wages HR') NOT NULL DEFAULT 'Wages Clerk'
+                    MODIFY COLUMN role ENUM('Account Manager', 'Wages Clerk', 'Accounts Clerk', 'Wages HR', 'Cape Town Admin') NOT NULL DEFAULT 'Wages Clerk'
                 `);
-                console.log('Users table ENUM updated to include Wages HR');
+                console.log('Users table ENUM updated to include Wages HR and Cape Town Admin');
             } catch (err) {
-                console.log('Note: Could not update users table ENUM:', err.message);
+                console.error('Failed to update users table ENUM. If creating Cape Town Admin users fails, run the ALTER TABLE manually:', err.message);
             }
 
             // Check if there are any users - if not, create defaults
@@ -152,7 +153,8 @@ const initializeUsers = async () => {
                 const defaultUsers = [
                     { full_name: 'Admin User', email: 'admin@payroll.com', password: 'admin123', role: 'Account Manager' },
                     { full_name: 'Sarah Smith', email: 'sarah@payroll.com', password: 'password123', role: 'Wages Clerk' },
-                    { full_name: 'John Doe', email: 'john@payroll.com', password: 'password123', role: 'Accounts Clerk' }
+                    { full_name: 'John Doe', email: 'john@payroll.com', password: 'password123', role: 'Accounts Clerk' },
+                    { full_name: 'Cape Town Admin', email: 'capetown@payroll.com', password: 'capetown123', role: 'Cape Town Admin' }
                 ];
                 
                 for (const user of defaultUsers) {

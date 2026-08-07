@@ -44,7 +44,7 @@ exports.updateClientrate = async (req, res) => {
         let params = [lookup, client_id, client_name, site, region, pay_cycle, sector, contact_person, contact_details, sales_rep, transaction_code, occupation, nt_hourly_rate, ot_1_5_rate, ot_2_0_rate, annual_leave, sick_leave, family_resp_leave, paid_public_holidays, severance_provision, annual_bonus, provident_fund, wellness_fund, industry_reg_levy, sub_total_a, uif, sdl, coida, sub_total_b, medicals, criminal_checks, ppe, preservation_fund, service_fee, admin_costs, payroll_financing_fee, supervision_fee, nt_invoice_rate, ot_1_5_invoice_rate, ot_2_0_invoice_rate, night_shift_allowance, substance_allowance, hazardous_allowance, nt_per_day, deduct_lunch_hour, hrs_pd, id];
         
         // Non-managers can only update their own records
-        if (req.user?.role !== 'Account Manager') {
+        if (req.user?.role !== 'Account Manager' && req.user?.role !== 'Cape Town Admin') {
           query += ' AND user_id=?';
           params.push(userId);
         }
@@ -71,7 +71,7 @@ exports.deleteClientrate = async (req, res) => {
     let params = [id];
     
     // Non-managers can only delete their own records
-    if (req.user?.role !== 'Account Manager') {
+    if (req.user?.role !== 'Account Manager' && req.user?.role !== 'Cape Town Admin') {
       query += ' AND user_id = ?';
       params.push(userId);
     }

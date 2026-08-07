@@ -408,7 +408,8 @@ exports.importBiometrics = async (req, res) => {
       }
       
       // Insert into database - note: total_hours column is used, start_time/end_time are NULL
-      const query = `INSERT INTO timesheets (timesheet_number, timesheet_date, client_id, client_name, co_number, transaction_code, occupation, shift_type, start_time, end_time, total_hours, actual_lunch_hours, isDoubleShift, status, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, NULL, FALSE, 'active', ?)`;
+      // actual_lunch_hours is set to 0 so biometrics imports don't deduct lunch
+      const query = `INSERT INTO timesheets (timesheet_number, timesheet_date, client_id, client_name, co_number, transaction_code, occupation, shift_type, start_time, end_time, total_hours, actual_lunch_hours, isDoubleShift, status, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, 0, FALSE, 'active', ?)`;
       
         try {
           const [result] = await pool.query(query, [

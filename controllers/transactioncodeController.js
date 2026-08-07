@@ -58,7 +58,7 @@ exports.updateTransactionCode = async (req, res) => {
     let params = [transaction_code, occupation_name, id];
     
     // Non-managers can only update their own records
-    if (req.user?.role !== 'Account Manager') {
+    if (req.user?.role !== 'Account Manager' && req.user?.role !== 'Cape Town Admin') {
       query += ' AND user_id=?';
       params.push(userId);
     }
@@ -85,7 +85,7 @@ exports.deleteTransactionCode = async (req, res) => {
     let params = [id];
     
     // Non-managers can only delete their own records
-    if (req.user?.role !== 'Account Manager') {
+    if (req.user?.role !== 'Account Manager' && req.user?.role !== 'Cape Town Admin') {
       query += ' AND user_id = ?';
       params.push(userId);
     }

@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS users (
     full_name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
-    role ENUM('Account Manager', 'Wages Clerk', 'Accounts Clerk', 'Wages HR') NOT NULL DEFAULT 'Wages Clerk',
+    role ENUM('Account Manager', 'Wages Clerk', 'Accounts Clerk', 'Wages HR', 'Cape Town Admin') NOT NULL DEFAULT 'Wages Clerk',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS users (
 INSERT INTO users (full_name, email, password_hash, role) VALUES 
 ('Admin User', 'admin@payroll.com', '$2a$10$rQZQZQZQZQZQZQZQZQZQZ.QQZQZQZQZQZQZQZQZQZQZQZQZQZQZQZ', 'Account Manager'),
 ('Sarah Smith', 'sarah@payroll.com', '$2a$10$rQZQZQZQZQZQZQZQZQZQZ.QQZQZQZQZQZQZQZQZQZQZQZQZQZQZQZ', 'Wages Clerk'),
-('John Doe', 'john@payroll.com', '$2a$10$rQZQZQZQZQZQZQZQZQZQZ.QQZQZQZQZQZQZQZQZQZQZQZQZQZQZQZ', 'Accounts Clerk')
+('John Doe', 'john@payroll.com', '$2a$10$rQZQZQZQZQZQZQZQZQZQZ.QQZQZQZQZQZQZQZQZQZQZQZQZQZQZQZ', 'Accounts Clerk'),
+('Cape Town Admin', 'capetown@payroll.com', '$2a$10$rQZQZQZQZQZQZQZQZQZQZ.QQZQZQZQZQZQZQZQZQZQZQZQZQZQZQZ', 'Cape Town Admin')
 ON DUPLICATE KEY UPDATE email = email;
 
 -- Note: The password hashes above are placeholders. 

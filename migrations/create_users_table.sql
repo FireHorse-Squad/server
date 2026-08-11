@@ -20,7 +20,3 @@ INSERT INTO users (full_name, email, password_hash, role) VALUES
 ('Cape Town Admin', 'capetown@payroll.com', '$2a$10$rQZQZQZQZQZQZQZQZQZQZ.QQZQZQZQZQZQZQZQZQZQZQZQZQZQZQZ', 'Cape Town Admin')
 ON DUPLICATE KEY UPDATE email = email;
 
--- Note: The password hashes above are placeholders. 
--- Run this Node.js script to create proper hashes:
--- const bcrypt = require('bcryptjs');
--- console.log(bcrypt.hashSync('admin123', 10));

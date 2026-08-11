@@ -4,10 +4,12 @@ const pool = require('../config/db');
 // Helper to get user_id from request (for data isolation)
 const getUserId = (req) => req.user?.id;
 
+const isTimesheetManager = (req) => req.user?.role === 'Account Manager' || req.user?.role === 'Wages Clerk';
+
 // --- READ (Get All) ---
 exports.getTimesheets = async (req, res) => {
   try {
-    const isManager = req.user?.role === 'Account Manager';
+    const isManager = isTimesheetManager(req);
     let activeQuery = 'SELECT *, \'active\' AS status FROM timesheets';
     let activeParams = [];
     let archivedQuery = 'SELECT *, \'archived\' AS status FROM archivedtimesheets';
@@ -73,7 +75,11 @@ exports.updateTimesheet = async (req, res) => {
             isUnarchive = true;
         }
 
-        const [existing] = await pool.query(`SELECT * FROM ${sourceTable} WHERE id = ?${req.user?.role !== 'Account Manager' ? ' AND user_id = ?' : ''}`, isArchive || isUnarchive ? [id, userId] : [id]);
+        const needsUserIdFilter = !isTimesheetManager(req);
+        const [existing] = await pool.query(
+            `SELECT * FROM ${sourceTable} WHERE id = ?${needsUserIdFilter ? ' AND user_id = ?' : ''}`,
+            needsUserIdFilter ? [id, userId] : [id]
+        );
 
         if (existing.length === 0) {
             return res.status(404).json({ message: 'Timesheet not found' });
@@ -244,7 +250,7 @@ exports.deleteTimesheet = async (req, res) => {
     let params = [id];
     
     // Non-managers can only delete their own records
-    if (req.user?.role !== 'Account Manager') {
+    if (!isTimesheetManager(req)) {
       query += ' AND user_id = ?';
       params.push(userId);
     }
@@ -448,7 +454,7 @@ exports.importBiometrics = async (req, res) => {
 // --- EXPORT TIMESHEETS TO CSV ---
 exports.exportTimesheetsCSV = async (req, res) => {
   try {
-    const isManager = req.user?.role === 'Account Manager';
+    const isManager = isTimesheetManager(req);
     let activeQuery = 'SELECT * FROM timesheets';
     let activeParams = [];
     let archivedQuery = 'SELECT * FROM archivedtimesheets';

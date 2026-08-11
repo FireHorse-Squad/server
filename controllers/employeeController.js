@@ -65,7 +65,7 @@ exports.updateEmployee = async (req, res) => {
         let params = [co_number, full_name, id_number, co_code, parsedId];
         
         // Non-managers can only update their own employees
-        if (req.user?.role !== 'Account Manager' && req.user?.role !== 'Cape Town Admin') {
+        if (req.user?.role !== 'Account Manager') {
           query += ' AND user_id=?';
           params.push(userId);
         }
@@ -92,7 +92,7 @@ exports.deleteEmployee = async (req, res) => {
     let params = [id];
     
     // Non-managers can only delete their own employees
-    if (req.user?.role !== 'Account Manager' && req.user?.role !== 'Cape Town Admin') {
+    if (req.user?.role !== 'Account Manager') {
       query += ' AND user_id = ?';
       params.push(userId);
     }

@@ -4,7 +4,7 @@ const pool = require('../config/db');
 // Helper to get user_id from request (for data isolation)
 const getUserId = (req) => req.user?.id;
 
-const isTimesheetManager = (req) => req.user?.role === 'Account Manager' || req.user?.role === 'Cape Town Admin';
+const isTimesheetManager = (req) => req.user?.role === 'Account Manager';
 
 // --- READ (Get All) ---
 exports.getTimesheets = async (req, res) => {

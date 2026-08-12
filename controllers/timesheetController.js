@@ -378,6 +378,17 @@ exports.importBiometrics = async (req, res) => {
       return res.status(400).json({ message: 'CSV file is empty' });
     }
 
+    const normalizeBiometricDate = (dateStr) => {
+      if (!dateStr || typeof dateStr !== 'string') return null;
+      const trimmed = dateStr.trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+      const match = trimmed.match(/^(\d{2})-(\d{2})-(\d{2,4})$/);
+      if (!match) return trimmed;
+      let [, day, month, year] = match;
+      if (year.length === 2) year = year >= 70 ? `19${year}` : `20${year}`;
+      return `${year}-${month}-${day}`;
+    };
+
     // Parse CSV - columns are mapped by position
     // Format: timesheet_number, timesheet_date, client_id, client_name, co_number, transaction_code, occupation, shift_type, total_hours
     const userId = getUserId(req);
@@ -395,9 +406,10 @@ exports.importBiometrics = async (req, res) => {
       }
       
       // Map columns: timesheet_number, timesheet_date, client_id, client_name, co_number, transaction_code, occupation, shift_type, total_hours
+      const rawDate = values[1];
       const row = {
         timesheet_number: values[0],
-        timesheet_date: values[1],
+        timesheet_date: normalizeBiometricDate(rawDate),
         client_id: values[2],
         client_name: values[3],
         co_number: values[4],

@@ -182,6 +182,7 @@ const ensureRequiredTables = async () => {
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 holiday_date DATE NOT NULL UNIQUE,
                 description VARCHAR(255),
+                country VARCHAR(50) DEFAULT 'ZA',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `,

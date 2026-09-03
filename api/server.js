@@ -114,3 +114,19 @@ if (require.main === module) {
 
 // Export the app for Vercel
 module.exports = app;
+
+// Graceful shutdown helper
+const gracefulShutdown = () => {
+  console.log('Shutting down gracefully...');
+  pool.end(() => {
+    console.log('Database pool closed.');
+    process.exit(0);
+  });
+  setTimeout(() => {
+    console.error('Forced shutdown due to timeout');
+    process.exit(1);
+  }, 10000);
+};
+
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);

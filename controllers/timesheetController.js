@@ -38,12 +38,12 @@ exports.getTimesheets = async (req, res) => {
 
 // --- CREATE ---
 exports.createTimesheet = async (req, res) => {
-  const { timesheet_number, client_name, timesheet_date, client_id, co_number, transaction_code, occupation, shift_type, start_time, end_time, units, rate, total_hours, actual_lunch_hours, isDoubleShift, status } = req.body;
+  const { timesheet_number, client_name, timesheet_date, client_id, co_number, transaction_code, occupation, shift_type, start_time, end_time, units, rate, total_hours, actual_lunch_hours, isDoubleShift, semi_weekly_hours, status } = req.body;
   const userId = getUserId(req);
   
   try {
-    const query = `INSERT INTO timesheets (timesheet_number, client_name, timesheet_date, client_id, co_number, transaction_code, occupation, shift_type, start_time, end_time, units, rate, total_hours, actual_lunch_hours, isDoubleShift, status, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-    const [result] = await pool.query(query, [timesheet_number, client_name, timesheet_date, client_id, co_number, transaction_code, occupation, shift_type, start_time, end_time, units, rate, total_hours, actual_lunch_hours, isDoubleShift, status || 'active', userId]);
+    const query = `INSERT INTO timesheets (timesheet_number, client_name, timesheet_date, client_id, co_number, transaction_code, occupation, shift_type, start_time, end_time, units, rate, total_hours, actual_lunch_hours, isDoubleShift, semi_weekly_hours, status, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    const [result] = await pool.query(query, [timesheet_number, client_name, timesheet_date, client_id, co_number, transaction_code, occupation, shift_type, start_time, end_time, units, rate, total_hours, actual_lunch_hours, isDoubleShift, semi_weekly_hours, status || 'active', userId]);
     res.status(201).json({ id: result.insertId, ...req.body, status: status || 'active', user_id: userId });
   } catch (error) {
     console.error(error);
@@ -206,10 +206,11 @@ exports.updateTimesheet = async (req, res) => {
             total_hours: updates.total_hours ?? existingRecord.total_hours,
             actual_lunch_hours: updates.actual_lunch_hours ?? existingRecord.actual_lunch_hours,
             isDoubleShift: updates.isDoubleShift ?? existingRecord.isDoubleShift,
+            semi_weekly_hours: updates.semi_weekly_hours ?? existingRecord.semi_weekly_hours,
             status: updates.status ?? existingRecord.status,
         };
         
-        const queryUpdate = `UPDATE timesheets SET timesheet_number=?, client_name=?, timesheet_date=?, client_id=?, co_number=?, transaction_code=?, occupation=?, shift_type=?, start_time=?, end_time=?, units=?, rate=?, total_hours=?, actual_lunch_hours=?, isDoubleShift=?, status=? WHERE id=?`;
+        const queryUpdate = `UPDATE timesheets SET timesheet_number=?, client_name=?, timesheet_date=?, client_id=?, co_number=?, transaction_code=?, occupation=?, shift_type=?, start_time=?, end_time=?, units=?, rate=?, total_hours=?, actual_lunch_hours=?, isDoubleShift=?, semi_weekly_hours=?, status=? WHERE id=?`;
         const [result] = await pool.query(queryUpdate, [
             mergedData.timesheet_number,
             mergedData.client_name,
@@ -226,6 +227,7 @@ exports.updateTimesheet = async (req, res) => {
             mergedData.total_hours,
             mergedData.actual_lunch_hours,
             mergedData.isDoubleShift,
+            mergedData.semi_weekly_hours,
             mergedData.status,
             id
         ]);
@@ -417,6 +419,7 @@ exports.importBiometrics = async (req, res) => {
         occupation: values[6],
         shift_type: values[7],
         total_hours: (values[8] && values[8] !== '' && !isNaN(values[8])) ? parseFloat(values[8]) : null,
+        semi_weekly_hours: /n\/s/i.test(values[6]) ? 'n/s' : null,
         // start_time and end_time will be NULL for biometrics imports
       };
       
@@ -427,7 +430,7 @@ exports.importBiometrics = async (req, res) => {
       
       // Insert into database - note: total_hours column is used, start_time/end_time are NULL
       // actual_lunch_hours is set to 0 so biometrics imports don't deduct lunch
-      const query = `INSERT INTO timesheets (timesheet_number, timesheet_date, client_id, client_name, co_number, transaction_code, occupation, shift_type, start_time, end_time, total_hours, actual_lunch_hours, isDoubleShift, status, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, 0, FALSE, 'active', ?)`;
+      const query = `INSERT INTO timesheets (timesheet_number, timesheet_date, client_id, client_name, co_number, transaction_code, occupation, shift_type, start_time, end_time, total_hours, actual_lunch_hours, isDoubleShift, semi_weekly_hours, status, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, 0, FALSE, ?, 'active', ?)`;
       
         try {
           const [result] = await pool.query(query, [
@@ -440,6 +443,7 @@ exports.importBiometrics = async (req, res) => {
             row.occupation || '',
             row.shift_type || 'Standard',
             row.total_hours || null,
+            row.semi_weekly_hours || null,
             userId
           ]);
           results.push(result.insertId);

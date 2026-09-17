@@ -40,9 +40,9 @@ exports.getTimesheets = async (req, res) => {
 exports.createTimesheet = async (req, res) => {
   const { timesheet_number, client_name, timesheet_date, client_id, co_number, transaction_code, occupation, shift_type, start_time, end_time, units, rate, total_hours, actual_lunch_hours, isDoubleShift, semi_weekly_hours, status } = req.body;
   const userId = getUserId(req);
-  
+
   try {
-    const query = `INSERT INTO timesheets (timesheet_number, client_name, timesheet_date, client_id, co_number, transaction_code, occupation, shift_type, start_time, end_time, units, rate, total_hours, actual_lunch_hours, isDoubleShift, semi_weekly_hours, status, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    const query = `INSERT INTO timesheets (timesheet_number, client_name, timesheet_date, client_id, co_number, transaction_code, occupation, shift_type, start_time, end_time, units, rate, total_hours, actual_lunch_hours, isDoubleShift, semi_weekly_hours, status, user_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`;
     const [result] = await pool.query(query, [timesheet_number, client_name, timesheet_date, client_id, co_number, transaction_code, occupation, shift_type, start_time, end_time, units, rate, total_hours, actual_lunch_hours, isDoubleShift, semi_weekly_hours, status || 'active', userId]);
     res.status(201).json({ id: result.insertId, ...req.body, status: status || 'active', user_id: userId });
   } catch (error) {
@@ -325,7 +325,7 @@ exports.importTimesheetsCSV = async (req, res) => {
       }
       
       // Insert into database with user_id
-      const query = `INSERT INTO timesheets (timesheet_number, timesheet_date, client_id, client_name, co_number, transaction_code, occupation, shift_type, start_time, end_time, units, rate, actual_lunch_hours, isDoubleShift, status, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)`;
+      const query = `INSERT INTO timesheets (timesheet_number, timesheet_date, client_id, client_name, co_number, transaction_code, occupation, shift_type, start_time, end_time, units, rate, actual_lunch_hours, isDoubleShift, status, user_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, NOW())`;
       
         try {
           const [result] = await pool.query(query, [
@@ -430,7 +430,7 @@ exports.importBiometrics = async (req, res) => {
       
       // Insert into database - note: total_hours column is used, start_time/end_time are NULL
       // actual_lunch_hours is set to 0 so biometrics imports don't deduct lunch
-      const query = `INSERT INTO timesheets (timesheet_number, timesheet_date, client_id, client_name, co_number, transaction_code, occupation, shift_type, start_time, end_time, total_hours, actual_lunch_hours, isDoubleShift, semi_weekly_hours, status, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, 0, FALSE, ?, 'active', ?)`;
+      const query = `INSERT INTO timesheets (timesheet_number, timesheet_date, client_id, client_name, co_number, transaction_code, occupation, shift_type, start_time, end_time, total_hours, actual_lunch_hours, isDoubleShift, semi_weekly_hours, status, user_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, 0, FALSE, ?, 'active', ?, NOW())`;
       
         try {
           const [result] = await pool.query(query, [
@@ -570,7 +570,7 @@ exports.migrateFromWorkhorse = async (req, res) => {
       }
 
       // Insert into database - use userId if available, otherwise allow null for shared access
-      const query = `INSERT INTO timesheets (timesheet_number, timesheet_date, client_id, client_name, co_number, transaction_code, occupation, shift_type, start_time, end_time, units, rate, actual_lunch_hours, isDoubleShift, status, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)`;
+      const query = `INSERT INTO timesheets (timesheet_number, timesheet_date, client_id, client_name, co_number, transaction_code, occupation, shift_type, start_time, end_time, units, rate, actual_lunch_hours, isDoubleShift, status, user_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, NOW())`;
       
       try {
         const [result] = await pool.query(query, [

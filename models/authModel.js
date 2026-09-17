@@ -270,6 +270,28 @@ const ensureRequiredTables = async () => {
     } catch (err) {
         console.log(`Note: Could not update archivedtimesheets table:`, err.message);
     }
+
+    try {
+        const [timesheetsExists] = await pool.query(`SHOW TABLES LIKE 'timesheets'`);
+        if (timesheetsExists.length > 0) {
+            const [columns] = await pool.query(`
+                SELECT COLUMN_NAME, DATA_TYPE 
+                FROM INFORMATION_SCHEMA.COLUMNS 
+                WHERE TABLE_SCHEMA = DATABASE() 
+                AND TABLE_NAME = 'timesheets'
+            `);
+            const columnMap = new Map(columns.map(c => [c.COLUMN_NAME, c.DATA_TYPE]));
+
+            if (!columnMap.has('created_at')) {
+                await pool.query(`ALTER TABLE timesheets ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP AFTER user_id`);
+            }
+            if (!columnMap.has('updated_at')) {
+                await pool.query(`ALTER TABLE timesheets ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at`);
+            }
+        }
+    } catch (err) {
+        console.log(`Note: Could not update timesheets table:`, err.message);
+    }
 };
 
 // Add user_id foreign key to tables for data isolation
@@ -290,13 +312,18 @@ const addUserIdToTables = async () => {
                 
                 if (columns.length === 0) {
                     console.log(`Adding user_id to ${table}...`);
-                    // Get the first user's ID (admin) for existing records
+                    const allowedTables = new Set(['timesheets', 'employees', 'client_rates', 'transaction_codes']);
+                    const safeTable = allowedTables.has(table) ? table : null;
+                    if (!safeTable) {
+                        throw new Error(`Invalid table name for user_id migration: ${table}`);
+                    }
+
                     const [users] = await pool.query('SELECT id FROM users LIMIT 1');
                     const defaultUserId = users.length > 0 ? users[0].id : 1;
-                    
-                    await pool.query(`ALTER TABLE ${table} ADD COLUMN user_id INT DEFAULT ?`, [defaultUserId]);
-                    await pool.query(`ALTER TABLE ${table} ADD FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE`);
-                    console.log(`user_id column added to ${table}`);
+
+                    await pool.query(`ALTER TABLE ${safeTable} ADD COLUMN user_id INT DEFAULT ${defaultUserId}`);
+                    await pool.query(`ALTER TABLE ${safeTable} ADD FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE`);
+                    console.log(`user_id column added to ${safeTable}`);
                 }
             } catch (err) {
                 console.log(`Note: Could not add user_id to ${table}:`, err.message);

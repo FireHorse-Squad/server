@@ -16,6 +16,7 @@ const pool = mysql.createPool({
 
   idleTimeout: 30000,
   connectTimeout: 10000,
+  timezone: 'Z',
 
   // Only use SSL if we are in a deployment environment
   ...(process.env.NODE_ENV === 'deployment' ? {

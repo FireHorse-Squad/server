@@ -42,8 +42,8 @@ exports.createTimesheet = async (req, res) => {
   const userId = getUserId(req);
 
   try {
-    const query = `INSERT INTO timesheets (timesheet_number, client_name, timesheet_date, client_id, co_number, transaction_code, occupation, shift_type, start_time, end_time, units, rate, total_hours, actual_lunch_hours, isDoubleShift, semi_weekly_hours, status, user_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`;
-    const [result] = await pool.query(query, [timesheet_number, client_name, timesheet_date, client_id, co_number, transaction_code, occupation, shift_type, start_time, end_time, units, rate, total_hours, actual_lunch_hours, isDoubleShift, semi_weekly_hours, status || 'active', userId]);
+    const query = `INSERT INTO timesheets (timesheet_number, client_name, timesheet_date, client_id, co_number, transaction_code, occupation, shift_type, start_time, end_time, units, rate, total_hours, actual_lunch_hours, isDoubleShift, semi_weekly_hours, status, user_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`;
+    const [result] = await pool.query(query, [timesheet_number, client_name, timesheet_date, client_id, co_number, transaction_code, occupation, shift_type, start_time, end_time, units, rate, total_hours, actual_lunch_hours, isDoubleShift ? 1 : 0, semi_weekly_hours, status || 'active', userId]);
     res.status(201).json({ id: result.insertId, ...req.body, status: status || 'active', user_id: userId });
   } catch (error) {
     console.error(error);

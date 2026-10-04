@@ -384,11 +384,15 @@ exports.importBiometrics = async (req, res) => {
       if (!dateStr || typeof dateStr !== 'string') return null;
       const trimmed = dateStr.trim();
       if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+      const slashMatch = trimmed.match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
+      if (slashMatch) {
+        return `${slashMatch[1]}-${slashMatch[2]}-${slashMatch[3]}`;
+      }
       const match = trimmed.match(/^(\d{2})-(\d{2})-(\d{2,4})$/);
       if (!match) return trimmed;
       let [, day, month, year] = match;
       if (year.length === 2) year = year >= 70 ? `19${year}` : `20${year}`;
-      return `${year}-${month}-${day}`;
+      return `${year}-${month}-{day}`;
     };
 
     // Parse CSV - columns are mapped by position

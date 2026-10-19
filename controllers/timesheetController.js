@@ -413,6 +413,9 @@ exports.importBiometrics = async (req, res) => {
       
       // Map columns: timesheet_number, timesheet_date, client_id, client_name, co_number, transaction_code, occupation, shift_type, total_hours
       const rawDate = values[1];
+      const rawShiftType = (values[7] || '').trim();
+      const BIOMETRIC_SHIFT_TYPES = ['Semi', 'Ad-Hoc', 'Adhoc'];
+      const resolvedShiftType = BIOMETRIC_SHIFT_TYPES.includes(rawShiftType) ? rawShiftType : null;
       const row = {
         timesheet_number: values[0],
         timesheet_date: normalizeBiometricDate(rawDate),
@@ -421,7 +424,7 @@ exports.importBiometrics = async (req, res) => {
         co_number: values[4],
         transaction_code: values[5],
         occupation: values[6],
-        shift_type: values[7],
+        shift_type: resolvedShiftType,
         total_hours: (values[8] && values[8] !== '' && !isNaN(values[8])) ? parseFloat(values[8]) : null,
         semi_weekly_hours: /n\/s/i.test(values[6]) ? 'n/s' : null,
         // start_time and end_time will be NULL for biometrics imports
@@ -445,7 +448,7 @@ exports.importBiometrics = async (req, res) => {
             row.co_number || null,
             row.transaction_code || '',
             row.occupation || '',
-            row.shift_type || 'Standard',
+            row.shift_type || null,
             row.total_hours || null,
             row.semi_weekly_hours || null,
             userId

@@ -108,3 +108,74 @@ exports.deleteEmployee = async (req, res) => {
     res.status(500).json({ message: 'Server error deleting employee' });
   }
 };
+
+// --- IMPORT CSV ---
+exports.importEmployeesCSV = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    const csvData = req.file.buffer.toString('utf-8');
+    const lines = csvData.split('\n').filter(line => line.trim() !== '');
+
+    if (lines.length < 1) {
+      return res.status(400).json({ message: 'CSV file is empty' });
+    }
+
+    const detectedDelimiter = lines[0].includes('\t') ? '\t' : ',';
+
+    const results = [];
+    const errors = [];
+    const userId = getUserId(req);
+
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(detectedDelimiter).map(v => v.trim().replace(/["\r]/g, ''));
+
+      const parseIdNumber = (val) => {
+        if (!val) return null;
+        if (/^[+-]?\d+(\.\d+)?[eE][+-]?\d+$/.test(val)) {
+          return String(Number(val));
+        }
+        return val;
+      };
+
+      const row = {
+        co_number: values[0] || null,
+        full_name: values[1] || null,
+        id_number: parseIdNumber(values[2]) || null,
+        co_code: values[3] || null,
+      };
+
+      if (!row.co_number && !row.full_name && !row.id_number && !row.co_code) {
+        continue;
+      }
+
+      if (!row.co_number) {
+        errors.push(`Row ${i + 1}: Co_number is required`);
+        continue;
+      }
+
+      try {
+        const query = `INSERT INTO employees (co_number, full_name, id_number, co_code, user_id) VALUES (?, ?, ?, ?, ?)`;
+        const [result] = await pool.query(query, [row.co_number, row.full_name, row.id_number, row.co_code, userId]);
+        results.push(result.insertId);
+      } catch (err) {
+        if (err.code === 'ER_DUP_ENTRY') {
+          errors.push(`Row ${i + 1}: Employee with co_number "${row.co_number}" already exists`);
+        } else {
+          errors.push(`Row ${i + 1}: ${err.message}`);
+        }
+      }
+    }
+
+    res.json({
+      message: `Successfully imported ${results.length} employees`,
+      imported: results.length,
+      errors: errors.length > 0 ? errors : undefined
+    });
+  } catch (error) {
+    console.error('Error importing employees:', error);
+    res.status(500).json({ message: 'Server error importing employees', details: error.message });
+  }
+};

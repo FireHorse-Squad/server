@@ -310,7 +310,7 @@ exports.importTimesheetsCSV = async (req, res) => {
         co_number: values[4],
         transaction_code: values[5],
         occupation: values[6],
-        shift_type: values[7],
+        shift_type: ['Task', 'Semi', 'Ad-Hoc', 'Adhoc'].includes(values[7] || '') ? values[7] : null,
         start_time: values[8] || '',
         end_time: values[9] || '',
         // Only set units/rate if they have valid numeric values
@@ -336,7 +336,7 @@ exports.importTimesheetsCSV = async (req, res) => {
             row.co_number || null,
             row.transaction_code || '',
             row.occupation || '',
-            row.shift_type || 'Standard',
+            row.shift_type || null,
             row.start_time || '',
             row.end_time || '',
             row.units || null,

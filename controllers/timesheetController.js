@@ -19,14 +19,6 @@ const normalizeDate = (dateStr) => {
     return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
   }
 
-  // DD-MM-YYYY or DD-MM-YY
-  const dmyMatch = trimmed.match(/^(\d{2})[-/](\d{2})[-/](\d{2,4})$/);
-  if (dmyMatch) {
-    let [, day, month, year] = dmyMatch;
-    if (year.length === 2) year = year >= 70 ? `19${year}` : `20${year}`;
-    return `${year}-${month}-${day}`;
-  }
-
   return null;
 };
 
@@ -434,7 +426,7 @@ exports.importTimesheetsCSV = async (req, res) => {
     const toInsert = allowDuplicates ? parsed.map(p => p.data) : insertRows;
 
     for (const row of toInsert) {
-      const query = `INSERT INTO timesheets (timesheet_number, timesheet_date, client_id, client_name, co_number, transaction_code, occupation, shift_type, start_time, end_time, units, rate, actual_lunch_hours, isDoubleShift, status, user_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, NOW())`;
+      const query = `INSERT INTO timesheets (timesheet_number, timesheet_date, client_id, client_name, co_number, transaction_code, occupation, shift_type, start_time, end_time, units, rate, actual_lunch_hours, isDoubleShift, status, user_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, NOW())`;
       try {
         const [result] = await pool.query(query, [
           row.timesheet_number || null,

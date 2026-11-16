@@ -6,6 +6,30 @@ const getUserId = (req) => req.user?.id;
 
 const isTimesheetManager = (req) => req.user?.role === 'Account Manager';
 
+// Validates and normalizes a date string to YYYY-MM-DD
+// Supported formats: YYYY-MM-DD, YYYY/MM/DD, DD-MM-YYYY, DD-MM-YY
+const normalizeDate = (dateStr) => {
+  if (!dateStr || typeof dateStr !== 'string') return null;
+  const trimmed = dateStr.trim();
+  if (!trimmed) return null;
+
+  // YYYY-MM-DD or YYYY/MM/DD
+  const isoMatch = trimmed.match(/^(\d{4})[-/](\d{2})[-/](\d{2})$/);
+  if (isoMatch) {
+    return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+  }
+
+  // DD-MM-YYYY or DD-MM-YY
+  const dmyMatch = trimmed.match(/^(\d{2})[-/](\d{2})[-/](\d{2,4})$/);
+  if (dmyMatch) {
+    let [, day, month, year] = dmyMatch;
+    if (year.length === 2) year = year >= 70 ? `19${year}` : `20${year}`;
+    return `${year}-${month}-${day}`;
+  }
+
+  return null;
+};
+
 // --- READ (Get All) ---
 exports.getTimesheets = async (req, res) => {
   try {
@@ -269,6 +293,41 @@ exports.deleteTimesheet = async (req, res) => {
   }
 };
 
+// Checks whether a timesheet with identical details already exists for the user.
+// Mirrors the manual-entry duplicate rule (excludes archived records).
+const findDuplicateTimesheet = async (userId, row) => {
+  const query = `
+    SELECT id FROM timesheets
+    WHERE user_id = ?
+      AND status <> 'archived'
+      AND timesheet_number <=> ?
+      AND timesheet_date <=> ?
+      AND client_id <=> ?
+      AND client_name <=> ?
+      AND co_number <=> ?
+      AND transaction_code <=> ?
+      AND occupation <=> ?
+      AND shift_type <=> ?
+      AND start_time <=> ?
+      AND end_time <=> ?
+    LIMIT 1
+  `;
+  const [found] = await pool.query(query, [
+    userId,
+    row.timesheet_number || null,
+    row.timesheet_date || null,
+    row.client_id || null,
+    row.client_name || '',
+    row.co_number || null,
+    row.transaction_code || '',
+    row.occupation || '',
+    row.shift_type || null,
+    row.start_time || '',
+    row.end_time || ''
+  ]);
+  return found.length > 0;
+};
+
 // --- IMPORT CSV ---
 exports.importTimesheetsCSV = async (req, res) => {
   try {
@@ -283,17 +342,33 @@ exports.importTimesheetsCSV = async (req, res) => {
       return res.status(400).json({ message: 'CSV file is empty' });
     }
 
+    // Detect delimiter (tab or comma) from the first line
+    const firstLine = lines[0] || '';
+    const delimiter = firstLine.includes('\t') ? '\t' : (firstLine.includes(',') ? ',' : ',');
+
+    // Skip header row if the second column is not a recognizable date
+    let startIndex = 0;
+    if (lines.length > 0) {
+      const firstValues = lines[0].split(delimiter).map(v => v.trim().replace(/["\r]/g, ''));
+      const firstDate = normalizeDate(firstValues[1] || '');
+      if (!firstDate && firstValues[1] && firstValues[1].trim()) {
+        startIndex = 1;
+      }
+    }
+
     // Parse CSV - columns are mapped by position
     // Correct format: timesheet_number, timesheet_date, client_id, client_name, co_number, transaction_code, occupation, shift_type, start_time, end_time, units, rate
     const expectedColumns = 12;
     const userId = getUserId(req);
+    const allowDuplicates = req.body.allowDuplicates === 'true';
     
     const results = [];
     const errors = [];
+    const parsed = [];
     
-    for (let i = 0; i < lines.length; i++) {
-      // Filter out empty values and handle trailing commas
-      const values = lines[i].split(',').map(v => v.trim().replace(/["\r]/g, '')).filter((v, idx, arr) => idx < 10 || v !== '');
+    for (let i = startIndex; i < lines.length; i++) {
+      // Filter out empty values and handle trailing delimiters
+      const values = lines[i].split(delimiter).map(v => v.trim().replace(/["\r]/g, '')).filter((v, idx, arr) => idx < 10 || v !== '');
       
       if (values.length < 8) {
         console.log(`[CSV Import] Row ${i + 1}: Not enough columns - expected at least 8, got ${values.length}`);
@@ -304,7 +379,7 @@ exports.importTimesheetsCSV = async (req, res) => {
       // Map columns by position (12 columns: timesheet_number, timesheet_date, client_id, client_name, co_number, transaction_code, occupation, shift_type, start_time, end_time, units, rate)
       const row = {
         timesheet_number: values[0],
-        timesheet_date: values[1],
+        timesheet_date: normalizeDate(values[1]),
         client_id: values[2],
         client_name: values[3],
         co_number: values[4],
@@ -323,33 +398,66 @@ exports.importTimesheetsCSV = async (req, res) => {
       if (!row.timesheet_number && !row.timesheet_date && !row.client_id) {
         continue;
       }
+
+      // Validate date format - reject rows with unrecognized dates instead of crashing
+      if (values[1] && values[1].trim() && !row.timesheet_date) {
+        errors.push(`Row ${i + 1}: Invalid date format '${values[1].trim()}' (expected YYYY-MM-DD, YYYY/MM/DD, or DD-MM-YYYY)`);
+        continue;
+      }
       
-      // Insert into database with user_id
-      const query = `INSERT INTO timesheets (timesheet_number, timesheet_date, client_id, client_name, co_number, transaction_code, occupation, shift_type, start_time, end_time, units, rate, actual_lunch_hours, isDoubleShift, status, user_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, NOW())`;
-      
-        try {
-          const [result] = await pool.query(query, [
-            row.timesheet_number || null,
-            row.timesheet_date || null,
-            row.client_id || null,
-            row.client_name || '',
-            row.co_number || null,
-            row.transaction_code || '',
-            row.occupation || '',
-            row.shift_type || null,
-            row.start_time || '',
-            row.end_time || '',
-            row.units || null,
-            row.rate || null,
-            row.actual_lunch_hours || null,
-            row.isDoubleShift || false,
-            userId
-          ]);
-          results.push(result.insertId);
-        } catch (err) {
-          console.log(`[CSV Import] Row ${i + 1} DB error:`, err.message);
-          errors.push(`Row ${i + 1}: ${err.message}`);
-        }
+      parsed.push({ row: i + 1, data: row });
+    }
+
+    // Detect duplicates against existing (non-archived) timesheets for this user
+    const duplicates = [];
+    const insertRows = [];
+    for (const { row: rowNum, data } of parsed) {
+      const isDup = await findDuplicateTimesheet(userId, data);
+      if (isDup) {
+        duplicates.push({ row: rowNum, ...data });
+      } else {
+        insertRows.push(data);
+      }
+    }
+
+    // When duplicates are present and the caller did not allow them, abort and
+    // report them so the frontend can prompt the user to import with duplicates
+    // or cancel. Nothing is inserted in this case.
+    if (!allowDuplicates && duplicates.length > 0) {
+      return res.status(409).json({
+        message: `Found ${duplicates.length} duplicate timesheet(s) in the import file`,
+        duplicates,
+        count: duplicates.length
+      });
+    }
+
+    const toInsert = allowDuplicates ? parsed.map(p => p.data) : insertRows;
+
+    for (const row of toInsert) {
+      const query = `INSERT INTO timesheets (timesheet_number, timesheet_date, client_id, client_name, co_number, transaction_code, occupation, shift_type, start_time, end_time, units, rate, actual_lunch_hours, isDoubleShift, status, user_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, NOW())`;
+      try {
+        const [result] = await pool.query(query, [
+          row.timesheet_number || null,
+          row.timesheet_date || null,
+          row.client_id || null,
+          row.client_name || '',
+          row.co_number || null,
+          row.transaction_code || '',
+          row.occupation || '',
+          row.shift_type || null,
+          row.start_time || '',
+          row.end_time || '',
+          row.units || null,
+          row.rate || null,
+          row.actual_lunch_hours || null,
+          row.isDoubleShift || false,
+          userId
+        ]);
+        results.push(result.insertId);
+      } catch (err) {
+        console.log(`[CSV Import] DB error:`, err.message);
+        errors.push(`${err.message}`);
+      }
     }
 
     console.log('[CSV Import] Total imported:', results.length, 'Total errors:', errors.length);
@@ -380,20 +488,7 @@ exports.importBiometrics = async (req, res) => {
       return res.status(400).json({ message: 'CSV file is empty' });
     }
 
-    const normalizeBiometricDate = (dateStr) => {
-      if (!dateStr || typeof dateStr !== 'string') return null;
-      const trimmed = dateStr.trim();
-      if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
-      const slashMatch = trimmed.match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
-      if (slashMatch) {
-        return `${slashMatch[1]}-${slashMatch[2]}-${slashMatch[3]}`;
-      }
-      const match = trimmed.match(/^(\d{2})-(\d{2})-(\d{2,4})$/);
-      if (!match) return trimmed;
-      let [, day, month, year] = match;
-      if (year.length === 2) year = year >= 70 ? `19${year}` : `20${year}`;
-      return `${year}-${month}-{day}`;
-    };
+    const normalizeBiometricDate = (dateStr) => normalizeDate(dateStr);
 
     // Parse CSV - columns are mapped by position
     // Format: timesheet_number, timesheet_date, client_id, client_name, co_number, transaction_code, occupation, shift_type, total_hours
@@ -432,6 +527,12 @@ exports.importBiometrics = async (req, res) => {
       
       // Skip empty rows
       if (!row.timesheet_number && !row.timesheet_date && !row.client_id) {
+        continue;
+      }
+
+      // Validate date format - reject rows with unrecognized dates instead of crashing
+      if (rawDate && rawDate.trim() && !row.timesheet_date) {
+        errors.push(`Row ${i + 1}: Invalid date format '${rawDate.trim()}' (expected YYYY-MM-DD, YYYY/MM/DD, or DD-MM-YYYY)`);
         continue;
       }
       

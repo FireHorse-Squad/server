@@ -4,6 +4,32 @@ const pool = require('../config/db');
 // Helper to get user_id from request (for data isolation)
 const getUserId = (req) => req.user?.id;
 
+// Numeric rate/amount columns. Empty strings must become NULL so MySQL
+// does not reject them as invalid decimal values (which surfaced as the
+// generic "Server error updating Client rate" 500).
+const NUMERIC_FIELDS = [
+    'nt_hourly_rate','ot_1_5_rate','ot_2_0_rate','annual_leave','sick_leave',
+    'family_resp_leave','paid_public_holidays','severance_provision','annual_bonus',
+    'provident_fund','wellness_fund','industry_reg_levy','sub_total_a','sub_total_b',
+    'uif','sdl','coida','medicals','criminal_checks','ppe','preservation_fund',
+    'service_fee','admin_costs','payroll_financing_fee','supervision_fee',
+    'nt_invoice_rate','ot_1_5_invoice_rate','ot_2_0_invoice_rate',
+    'night_shift_allowance','substance_allowance','hazardous_allowance',
+    'nt_per_day','deduct_lunch_hour','hrs_pd'
+];
+
+const sanitizeNumericFields = (body) => {
+    NUMERIC_FIELDS.forEach((f) => {
+        const v = body[f];
+        if (v === '' || v == null) {
+            body[f] = null;
+        } else if (typeof v === 'string') {
+            const n = parseFloat(v);
+            body[f] = isNaN(n) ? null : n;
+        }
+    });
+};
+
 // ---- READ (Get All) -----
 exports.getClientrates = async(req,res) => {
     try {
@@ -20,6 +46,7 @@ exports.getClientrates = async(req,res) => {
 
 // ---- CREATE  -----
 exports.createClientrate = async(req,res) => {
+    sanitizeNumericFields(req.body);
     const {lookup, client_id, client_name, site, region, pay_cycle, sector, contact_person, contact_details, sales_rep, transaction_code, occupation, nt_hourly_rate, ot_1_5_rate, ot_2_0_rate, annual_leave, sick_leave, family_resp_leave, paid_public_holidays, severance_provision, annual_bonus, provident_fund, wellness_fund, industry_reg_levy, sub_total_a, uif, sdl, coida, sub_total_b, medicals, criminal_checks, ppe, preservation_fund, service_fee, admin_costs, payroll_financing_fee, supervision_fee, nt_invoice_rate, ot_1_5_invoice_rate, ot_2_0_invoice_rate, night_shift_allowance, substance_allowance, hazardous_allowance, nt_per_day, deduct_lunch_hour, hrs_pd} = req.body
     const userId = getUserId(req);
     
@@ -36,6 +63,7 @@ exports.createClientrate = async(req,res) => {
 // ---- UPDATE -----
 exports.updateClientrate = async (req, res) => {
     const { id } = req.params;
+    sanitizeNumericFields(req.body);
     const { lookup, client_id, client_name, site, region, pay_cycle, sector, contact_person, contact_details, sales_rep, transaction_code, occupation, nt_hourly_rate, ot_1_5_rate, ot_2_0_rate, annual_leave, sick_leave, family_resp_leave, paid_public_holidays, severance_provision, annual_bonus, provident_fund, wellness_fund, industry_reg_levy, sub_total_a, uif, sdl, coida, sub_total_b, medicals, criminal_checks, ppe, preservation_fund, service_fee, admin_costs, payroll_financing_fee, supervision_fee, nt_invoice_rate, ot_1_5_invoice_rate, ot_2_0_invoice_rate, night_shift_allowance, substance_allowance, hazardous_allowance, nt_per_day, deduct_lunch_hour, hrs_pd } = req.body;
     const userId = getUserId(req);
     
